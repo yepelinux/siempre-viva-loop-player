@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1b1530">
-<title>Andisei · Coros en loop</title>
+<title>Siempre Viva Loop Player</title>
 <style>
   :root {
     --bg: #1b1530; --card: #272043; --line: #3a3160; --text: #f4f1ff; --muted: #a9a2c8;
@@ -61,12 +61,24 @@
   .tracks button { display: flex; justify-content: space-between; align-items: center; text-align: left; background: var(--bg); padding: 14px; }
   .tracks button.on { outline: 2px solid var(--accent); }
   .tracks button .d { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .who { color: var(--muted); font-size: 14px; margin: -6px 0 12px; }
+  .who button { background: none; padding: 0 4px; color: var(--accent); font-size: 14px; text-decoration: underline; }
+  .gate { position: fixed; inset: 0; background: rgba(15,11,30,.92); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
+  .gate[hidden] { display: none; }
+  .gate form { background: var(--card); border-radius: 18px; padding: 22px; width: 100%; max-width: 380px; }
+  .gate h2 { margin: 0 0 6px; font-size: 20px; }
+  .gate p { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+  .gate input { width: 100%; font: inherit; font-size: 18px; padding: 14px; border-radius: 12px; border: 2px solid var(--line); background: var(--bg); color: var(--text); margin-bottom: 12px; }
+  .gate input:focus { outline: none; border-color: var(--accent-2); }
+  .gate button { width: 100%; background: var(--accent); color: #241a00; font-weight: 800; font-size: 17px; }
+  .gate button:disabled { opacity: .4; }
   .hint { color: var(--muted); font-size: 13px; margin-top: 8px; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Andisei · Coros en loop <small>(prototipo)</small></h1>
+  <h1>Siempre Viva Loop Player</h1>
+  <div class="who" id="who"></div>
 
   <section class="card">
     <div class="label">Mi voz</div>
@@ -120,6 +132,15 @@
   </section>
 </main>
 
+<div class="gate" id="gate" hidden>
+  <form id="gateForm">
+    <h2>¡Hola! ¿Cómo te llamás?</h2>
+    <p>Así sabemos quién está practicando.</p>
+    <input id="nameInput" autocomplete="name" maxlength="40" placeholder="Nombre y apellido" required>
+    <button type="submit" id="nameOk" disabled>Entrar</button>
+  </form>
+</div>
+
 <audio id="audio" preload="auto"></audio>
 
 <script>
@@ -132,6 +153,55 @@ const VOICES = [1, 2, 3, 4];
 const SPEEDS = [1, 0.9, 0.75];
 
 const $ = (id) => document.getElementById(id);
+
+// --- Usage metrics: Baltasar's Counterscale. Each event is a virtual path, so the dashboard's
+// "Paths" table answers who practiced what. Name lives only in this browser.
+const STATS = 'https://baltasar-analytics.rapistacknow.workers.dev';
+const SITE_ID = 'siempre-viva-loop-player';
+let userName = (localStorage.getItem('svlp-name') || '').trim();
+const slug = (txt) => txt.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'sin-nombre';
+let hitType = null;
+async function track(event) {
+  if (!userName || /^(localhost|127\.)/.test(location.hostname)) return;
+  try {
+    if (hitType === null) {
+      const r = await fetch(`${STATS}/cache?sid=${SITE_ID}`).then((x) => x.json()).catch(() => ({ ht: 1 }));
+      hitType = r.ht ?? 1;
+    }
+    const q = new URLSearchParams({ sid: SITE_ID, h: location.origin, p: `/${slug(userName)}/${event}`, r: '', ht: String(hitType) });
+    hitType = 2; // only the first hit of the visit counts as a new visit
+    fetch(`${STATS}/collect?${q}`, { mode: 'no-cors', keepalive: true });
+  } catch { /* metrics never break the player */ }
+}
+const loopTag = () => `voz-${state.voice}/` + (state.track === null ? 'loop-a-medida' : `track-${state.track + 1}`);
+// One "escuchando" hit per minute of actual playback = minutes practiced.
+let playedSec = 0;
+setInterval(() => { if (!audio.paused && ++playedSec % 60 === 0) track(`escuchando/${loopTag()}`); }, 1000);
+
+function renderWho() {
+  $('who').innerHTML = userName ? `Practica: <b></b> <button id="changeName">cambiar</button>` : '';
+  if (!userName) return;
+  $('who').querySelector('b').textContent = userName;
+  $('changeName').onclick = askName;
+}
+function askName() {
+  $('nameInput').value = userName;
+  $('nameOk').disabled = $('nameInput').value.trim().length < 2;
+  $('gate').hidden = false;
+  setTimeout(() => $('nameInput').focus(), 50);
+}
+$('nameInput').addEventListener('input', () => { $('nameOk').disabled = $('nameInput').value.trim().length < 2; });
+$('gateForm').addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  const n = $('nameInput').value.replace(/\s+/g, ' ').trim();
+  if (n.length < 2) return;
+  userName = n;
+  localStorage.setItem('svlp-name', n);
+  $('gate').hidden = true;
+  renderWho();
+  track('entra');
+});
 const audio = $('audio');
 const saved = JSON.parse(localStorage.getItem('andisei-loop-v2') || '{}');
 const state = {
@@ -204,7 +274,7 @@ function renderVoices() {
     const btn = document.createElement('button');
     btn.textContent = `Voz ${v}`;
     btn.className = v === state.voice ? 'on' : '';
-    btn.onclick = () => loadVoice(v, true);
+    btn.onclick = () => { loadVoice(v, true); track(`elige/voz-${v}`); };
     $('voices').appendChild(btn);
   });
 }
@@ -215,7 +285,7 @@ function renderTracks() {
     const btn = document.createElement('button');
     btn.className = state.track === i ? 'on' : '';
     btn.innerHTML = `<span>${tr.name}</span><span class="d">${fmt(tr.a, false)} – ${fmt(tr.b, false)} · ${Math.round(tr.b - tr.a)}s</span>`;
-    btn.onclick = () => { setLoop(tr.a, tr.b, i); state.looping = true; render(); goToLoopStart(true); };
+    btn.onclick = () => { setLoop(tr.a, tr.b, i); state.looping = true; render(); goToLoopStart(true); track(`elige/${loopTag()}`); };
     $('tracks').appendChild(btn);
   });
 }
@@ -260,6 +330,7 @@ function render() {
 
 $('play').onclick = () => {
   if (audio.paused) {
+    track(`play/${loopTag()}`);
     if (state.looping && (audio.currentTime < state.a || audio.currentTime >= state.b)) audio.currentTime = state.a;
     audio.play();
   } else audio.pause();
@@ -274,6 +345,7 @@ $('slow').onclick = () => {
   $('slow').textContent = `${state.speed}×`;
 };
 $('next').onclick = () => {
+  track(`ya-me-sale/${loopTag()}`);
   if (state.track !== null) {
     const i = Math.min(TRACKS.length - 1, state.track + 1);
     setLoop(TRACKS[i].a, TRACKS[i].b, i);
@@ -293,6 +365,7 @@ $('markB').onclick = () => {
   if (t <= state.a + 0.5) return;
   setLoop(state.a, t, null);
   goToLoopStart(!audio.paused);
+  track(`elige/${loopTag()}`);
 };
 document.querySelectorAll('.nudge button').forEach((btn) => {
   btn.onclick = () => {
@@ -316,6 +389,7 @@ $('timeline').addEventListener('pointerdown', (ev) => {
   state.looping = true;
   render();
   goToLoopStart(true);
+  track(`elige/${loopTag()}`);
 });
 
 // The big bar only scrubs inside the current loop (track or custom).
@@ -343,6 +417,8 @@ if ('mediaSession' in navigator) {
 
 loadVoice(state.voice, false);
 render();
+renderWho();
+if (userName) track('entra'); else askName();
 requestAnimationFrame(tick);
 </script>
 </body>

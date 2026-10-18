@@ -1,4 +1,4 @@
-# Andisei · Coros en loop
+# Siempre Viva Loop Player
 
 Reproductor web para practicar los coros de la escuela de comedia musical Andisei: elegís tu voz, un track del compilado o un tramo a medida, y lo repetís en loop hasta que sale.
 
