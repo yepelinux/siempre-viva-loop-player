@@ -161,18 +161,17 @@ const SITE_ID = 'siempre-viva-loop-player';
 let userName = (localStorage.getItem('svlp-name') || '').trim();
 const slug = (txt) => txt.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
   .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'sin-nombre';
-let hitType = null;
-async function track(event) {
+// Same as Counterscale's tracker: ask /cache before each hit so the server decides new visit vs. repeat.
+// Hits are chained so two quick events can't both count as a new visit.
+let queue = Promise.resolve();
+function track(event) {
   if (!userName || /^(localhost|127\.)/.test(location.hostname)) return;
-  try {
-    if (hitType === null) {
-      const r = await fetch(`${STATS}/cache?sid=${SITE_ID}`).then((x) => x.json()).catch(() => ({ ht: 1 }));
-      hitType = r.ht ?? 1;
-    }
-    const q = new URLSearchParams({ sid: SITE_ID, h: location.origin, p: `/${slug(userName)}/${event}`, r: '', ht: String(hitType) });
-    hitType = 2; // only the first hit of the visit counts as a new visit
-    fetch(`${STATS}/collect?${q}`, { mode: 'no-cors', keepalive: true });
-  } catch { /* metrics never break the player */ }
+  const path = `/${slug(userName)}/${event}`;
+  queue = queue.then(async () => {
+    const { ht = 1 } = await fetch(`${STATS}/cache?sid=${SITE_ID}`).then((x) => x.json()).catch(() => ({}));
+    const q = new URLSearchParams({ sid: SITE_ID, h: location.origin, p: path, r: '', ht: String(ht) });
+    await fetch(`${STATS}/collect?${q}`, { mode: 'no-cors', keepalive: true });
+  }).catch(() => { /* metrics never break the player */ });
 }
 const loopTag = () => `voz-${state.voice}/` + (state.track === null ? 'loop-a-medida' : `track-${state.track + 1}`);
 // One "escuchando" hit per minute of actual playback = minutes practiced.
