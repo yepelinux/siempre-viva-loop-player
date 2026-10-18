@@ -146,7 +146,7 @@
 <script>
 // Boundaries detected from the silences (same in the 4 voices). Padded a bit so the loop breathes.
 const DURATION = 1023.03;
-const RAW = [[0, 169], [171.0, 200.0], [202.0, 304.5], [306.0, 339.0], [341.0, 392.7], [397.1, 504.0], [506.3, 727.9], [730.3, 807.0], [808.0, 833.0], [834.5, 862.0], [863.5, DURATION]];
+const RAW = [[0, 169], [171.0, 200.0], [202.0, 304.5], [306.0, 339.0], [341.0, 392.7], [397.1, 451.0], [452.4, 504.0], [506.3, 688.0], [689.0, 727.9], [730.3, 807.0], [808.0, 833.0], [834.5, 862.0], [863.5, DURATION]];
 const PAD = 0.3;
 const TRACKS = RAW.map(([s, e], i) => ({ name: `Track ${i + 1}`, a: Math.max(0, s - PAD), b: Math.min(DURATION, e + PAD) }));
 const VOICES = [1, 2, 3, 4];
@@ -202,7 +202,7 @@ $('gateForm').addEventListener('submit', (ev) => {
   track('entra');
 });
 const audio = $('audio');
-const saved = JSON.parse(localStorage.getItem('andisei-loop-v2') || '{}');
+const saved = JSON.parse(localStorage.getItem('andisei-loop-v3') || '{}');
 const state = {
   voice: saved.voice || 1,
   a: saved.a ?? TRACKS[0].a,
@@ -218,7 +218,7 @@ const fmt = (t, dec = true) => {
   const m = Math.floor(t / 60), s = t - m * 60;
   return `${m}:${(dec ? s.toFixed(1) : Math.floor(s).toString()).padStart(dec ? 4 : 2, '0')}`;
 };
-const save = () => localStorage.setItem('andisei-loop-v2', JSON.stringify({ voice: state.voice, a: state.a, b: state.b, track: state.track, looping: state.looping, t: audio.currentTime }));
+const save = () => localStorage.setItem('andisei-loop-v3', JSON.stringify({ voice: state.voice, a: state.a, b: state.b, track: state.track, looping: state.looping, t: audio.currentTime }));
 
 function loadVoice(v, keepTime) {
   const t = keepTime ? audio.currentTime : (saved.t ?? state.a);
